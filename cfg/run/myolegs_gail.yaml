@@ -1,0 +1,19 @@
+# Paths
+smpl_data_dir: "data/smpl"
+motion_file: "data/motions/expert_motions.pkl"
+expert_buffer_path: "data/buffers/expert_buffer.pth"
+initial_pose_file: "data/initial_poses.pkl"
+
+# Parameters
+motion_id: 0
+num_motions: 1
+random_sample: false
+random_start: true
+recording_biomechanics: true
+
+# Execution
+device: "cuda"
+test: false
+checkpoint: 0
+num_eval_runs: 10
+target_velocity: 1.2

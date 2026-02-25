@@ -1,0 +1,14 @@
+# Environment Reward Weights
+reward_specs:
+  w_upright: 1.0
+  w_energy: 0.01
+  w_gail: 0.1
+
+# GAIL Hyperparameters
+history_len: 3
+gail_hidden_units: [256, 256]
+lr_disc: 0.0003
+
+# Task Settings
+termination_distance: 0.5
+resampling_interval: 10
