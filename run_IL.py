@@ -15,6 +15,15 @@ def main(cfg: DictConfig):
     
     logger.info(f"Using device: {device}")
     
+    if not cfg.no_log:
+        import wandb
+        wandb.init(
+            project=cfg.project,
+            name=cfg.exp_name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+            notes=cfg.get("notes", "")
+        )
+    
     # Initialize Agent
     agent = AgentGAIL(
         cfg=cfg,

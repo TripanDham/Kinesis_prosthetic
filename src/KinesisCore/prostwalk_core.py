@@ -38,21 +38,19 @@ torch.set_num_threads(1)
 
 class ProstWalkCore:
 
-    def __init__(self, config):
+    def __init__(self, config, joint_names=None):
         self.config = config
         self.dtype = np.float32
+        self.joint_names = joint_names
 
         self.load_data(config.motion_file)
-        self._curr_motion_ids = None
-        self._sampling_prob = (
+        self._curr_motion_ids = np.arange(self._num_unique_motions)
+        self._sampling_batch_prob = (
             np.ones(self._num_unique_motions) / self._num_unique_motions
         )
         self._velocity_groups = self._bunch_by_velocity()
-        # Ignoring mesh parsers for now
-        self.mesh_parsers = None
-
-        self.fk_model = ForwardKinematics(config.data_dir)
-        # self.fk_model = Humanoid_Batch("smpl")
+        # SMPL features are disabled
+        self.fk_model = None
 
     def load_data(self, filepath: str) -> None:
         """
@@ -63,6 +61,7 @@ class ProstWalkCore:
         else:
             self.motion_data = joblib.load(filepath)
         self._num_unique_motions = len(self.motion_data.keys())
+        self._curr_motion_ids = np.array(list(range(self._num_unique_motions)))
 
     def _load_opensim_dir(self, directory: str) -> dict:
         """Loads all .mot files in a directory and returns a dictionary of motion data."""
@@ -76,7 +75,7 @@ class ProstWalkCore:
         print(f"Parsing {len(mot_files)} .mot files...")
         for mot_file in tqdm(mot_files):
             name = mot_file.stem
-            data = self._parse_mot(str(mot_file))
+            data = self._parse_mot(str(mot_file), self.joint_names)
             motion_data[name] = data
         
         # Cache for next time
@@ -84,7 +83,7 @@ class ProstWalkCore:
         joblib.dump(motion_data, cache_file)
         return motion_data
 
-    def _parse_mot(self, filepath: str) -> dict:
+    def _parse_mot(self, filepath: str, mu_joint_names: List[str] = None) -> dict:
         """Parses an OpenSim .mot file into a dictionary compatible with ProstWalkCore."""
         with open(filepath, 'r') as f:
             lines = f.readlines()
@@ -98,7 +97,7 @@ class ProstWalkCore:
                 header_end = i + 1
                 break
         
-        df = pd.read_csv(filepath, sep='\t', skiprows=header_end)
+        df = pd.read_csv(filepath, sep='\s+', skiprows=header_end)
         
         # Minimally map Pelvis and Time
         fps = 1.0 / (df['time'].iloc[1] - df['time'].iloc[0]) if len(df) > 1 else 30
@@ -114,19 +113,52 @@ class ProstWalkCore:
         pelvis_quat = sRot.from_euler('xyz', pelvis_euler).as_quat()
         pelvis_trans = df[['pelvis_tx', 'pelvis_ty', 'pelvis_tz']].values
         
-        # Collect all joint angles (excluding time and pelvis coords)
-        exclude = ['time', 'pelvis_tilt', 'pelvis_list', 'pelvis_rotation', 'pelvis_tx', 'pelvis_ty', 'pelvis_tz']
-        joint_cols = [c for c in df.columns if c not in exclude]
-        joint_angles = df[joint_cols].values * unit_scale
+        if mu_joint_names is not None:
+             # Map provided MuJoCo joints to mot columns
+             # mu_joint_names should not include the free/root joint if handled separately
+             joint_angles = np.zeros((len(df), len(mu_joint_names)), dtype=np.float32)
+             for i, mu_name in enumerate(mu_joint_names):
+                  if mu_name in df.columns:
+                       joint_angles[:, i] = df[mu_name].values * unit_scale
+                  elif mu_name == 'myolegs_root':
+                       continue 
+        else:
+            # Fallback to old behavior: extract everything except pelvis
+            exclude = ['time', 'pelvis_tilt', 'pelvis_list', 'pelvis_rotation', 'pelvis_tx', 'pelvis_ty', 'pelvis_tz']
+            joint_cols = [c for c in df.columns if c not in exclude]
+            joint_angles = df[joint_cols].values * unit_scale
         
         # Combine into qpos-like structure for ProstWalkCore
-        # (trans(3), quat(4), joints(N))
-        qpos = np.concatenate([pelvis_trans, pelvis_quat, joint_angles], axis=1)
+        # Note: pelvis_quat is typically [x, y, z, w]. 
+        # MuJoCo uses [w, x, y, z].
+        pelvis_quat_mj = np.roll(pelvis_quat, 1, axis=1) # [x, y, z, w] -> [w, x, y, z]
         
-        # Compute qvel (simple finite difference)
+        qpos = np.concatenate([pelvis_trans, pelvis_quat_mj, joint_angles], axis=1)
+        
+        # Compute qvel
         dt = 1.0 / fps
-        qvel = np.diff(qpos, axis=0) / dt
-        qvel = np.concatenate([qvel, qvel[-1:]], axis=0) # Match length
+        # 1. Pelvis linear velocity (world frame)
+        lin_vel = np.diff(pelvis_trans, axis=0) / dt
+        
+        # 2. Pelvis angular velocity (world frame)
+        # pelvis_quat is [x, y, z, w] from sRot
+        r = sRot.from_quat(pelvis_quat)
+        r1 = r[:-1]
+        r2 = r[1:]
+        # Local angular velocity: r1.inv() * r2
+        rel_rot = r1.inv() * r2
+        ang_vel_local = rel_rot.as_rotvec() / dt
+        # Convert to world frame: omega_world = r1.apply(omega_local)
+        ang_vel = r1.apply(ang_vel_local)
+        
+        # 3. Joint velocities
+        joint_vel = np.diff(joint_angles, axis=0) / dt
+        
+        # Combine into qvel-like structure (lin(3), ang(3), joints(N))
+        qvel = np.concatenate([lin_vel, ang_vel, joint_vel], axis=1)
+        
+        # Match length by padding the last frame
+        qvel = np.concatenate([qvel, qvel[-1:]], axis=0)
         
         return {
             'qpos': qpos.astype(np.float32),
@@ -165,7 +197,8 @@ class ProstWalkCore:
     def load_motions(
             self,
             m_cfg: dict,
-            shape_params: List[np.ndarray],
+            num_motions: int = None,
+            shape_params: List[np.ndarray] = None,
             random_sample: bool = True,
             start_idx: int = 0,
             silent: bool = False,
@@ -182,7 +215,12 @@ class ProstWalkCore:
 
         self.num_joints = 24
 
-        num_motion_to_load = len(shape_params)  # This assumes that the number of shape params defines the number of motions to load
+        if num_motions is not None:
+             num_motion_to_load = num_motions
+        elif shape_params is not None:
+             num_motion_to_load = len(shape_params)
+        else:
+             num_motion_to_load = self._num_unique_motions
         if specific_idxes is not None:
             if len(specific_idxes) < num_motion_to_load:
                 num_motion_to_load = len(specific_idxes)
@@ -446,7 +484,9 @@ class ProstWalkCore:
         qvel = self.qvel[fl]
 
         if offset is not None:
-            dof_pos = dof_pos + offset[..., None, :]
+            xpos = xpos + offset
+            qpos = qpos.copy()
+            qpos[..., :3] = qpos[..., :3] + offset
 
         return EasyDict(
             {

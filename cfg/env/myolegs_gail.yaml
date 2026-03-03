@@ -1,14 +1,27 @@
-# Environment Reward Weights
+clip_actions: true
+control_frequency_inv: 5
+fatigue_reset_random: false
+fatigue_reset_vec: null
+gail_hidden_units:
+- 256
+- 256
+history_len: 3
+kd_scale: 1.0
+knockout_muscles: null
+kp_scale: 1.0
+lr_disc: 0.0003
+muscle_condition: ''
+persistent_fatigue: false
+resampling_interval: 100
 reward_specs:
-  w_upright: 1.0
+  k_energy: 0.05
+  k_pos: 200
+  k_vel: 5
   w_energy: 0.01
   w_gail: 0.1
-
-# GAIL Hyperparameters
-history_len: 3
-gail_hidden_units: [256, 256]
-lr_disc: 0.0003
-
-# Task Settings
-termination_distance: 0.5
-resampling_interval: 10
+  w_pos: 0.6
+  w_upright: 1.0
+  w_vel: 0.2
+sim_timestep_inv: 150
+task: MyoLegs Imitation
+termination_distance: 0.15

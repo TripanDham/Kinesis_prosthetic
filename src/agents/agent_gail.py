@@ -6,15 +6,16 @@ import torch.nn.functional as F
 import numpy as np
 import time
 import logging
-from src.agents.agent_im import AgentIM
-from gail_airl_ppo.buffer import SerializedBuffer
-from src.learning.learning_utils import to_train, to_test
+from src.agents.agent_humanoid import AgentHumanoid
+from src.env.myolegs_IL import MyoLegsGAIL
+from src.KinesisCore.expert_dataset import get_expert_loader
+from src.learning.learning_utils import to_train, to_test, to_device
 
 logger = logging.getLogger(__name__)
 
-class AgentGAIL(AgentIM):
+class AgentGAIL(AgentHumanoid):
     """
-    AgentGAIL integrates GAIL discriminator training into the AgentIM framework.
+    AgentGAIL integrates GAIL discriminator training into the AgentHumanoid framework.
     """
     
     def __init__(self, cfg, dtype, device, training: bool = True, checkpoint_epoch: int = 0):
@@ -22,12 +23,22 @@ class AgentGAIL(AgentIM):
         
         # Expert buffer for discriminator training
         if training:
-            self.buffer_exp = SerializedBuffer(
+            self.history_len = cfg.env.get("history_len", 3)
+            self.batch_size_disc = cfg.learning.get("batch_size_disc", 64)
+            self.loader_exp = get_expert_loader(
                 path=cfg.run.expert_buffer_path,
-                device=device
+                batch_size=self.batch_size_disc,
+                history_len=self.history_len,
+                shuffle=True
             )
-            self.epoch_disc = cfg.agent.get("epoch_disc", 10)
-            self.batch_size_disc = cfg.agent.get("batch_size_disc", 64)
+            self.iter_exp = iter(self.loader_exp)
+            self.epoch_disc = cfg.learning.get("epoch_disc", 10)
+    def setup_env(self):
+        """
+        Initializes the MyoLegsGAIL environment based on the configuration.
+        """
+        self.env = MyoLegsGAIL(self.cfg)
+        logger.info("MyoLegsGAIL environment initialized.")
 
     def update_params(self, batch) -> float:
         """
@@ -73,8 +84,13 @@ class AgentGAIL(AgentIM):
             actions_pi = torch.zeros((self.batch_size_disc, 0), device=self.device)
             
             # Sample from expert buffer
-            states_exp, actions_exp = self.buffer_exp.sample(self.batch_size_disc)[:2]
-            # If expert buffer only has states, actions_exp might be empty or wrong.
+            try:
+                states_exp = next(self.iter_exp)
+            except StopIteration:
+                self.iter_exp = iter(self.loader_exp)
+                states_exp = next(self.iter_exp)
+            
+            states_exp = states_exp.to(self.dtype).to(self.device)
             # GAILDiscrim.forward(states, actions)
             
             # Update discriminator

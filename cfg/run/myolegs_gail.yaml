@@ -1,19 +1,30 @@
 # Paths
 smpl_data_dir: "data/smpl"
-motion_file: "data/motions/expert_motions.pkl"
-expert_buffer_path: "data/buffers/expert_buffer.pth"
-initial_pose_file: "data/initial_poses.pkl"
+motion_file: "/media/tripan/Data/DDP/amputee_data/training_data"
+expert_buffer_path: "/media/tripan/Data/DDP/Kinesis_prosthetic/data/buffers/expert_buffer.pth"
+initial_pose_file: "/media/tripan/Data/DDP/amputee_data/training_data/processed_motions.joblib"
+xml_path: "/media/tripan/Data/DDP/Kinesis_prosthetic/data/xml/myolegs_OSL_KA.xml"
 
 # Parameters
 motion_id: 0
-num_motions: 1
+num_motions: 22
 random_sample: false
 random_start: true
 recording_biomechanics: true
 
 # Execution
+im_eval: false
 device: "cuda"
 test: false
 checkpoint: 0
 num_eval_runs: 10
 target_velocity: 1.2
+headless: true
+num_threads: 1
+fast_forward: true
+deactivate_muscles: false
+
+# Observation Space (Matches train_run.yaml)
+proprioceptive_inputs: ["root_height", "root_tilt", "local_body_pos", "local_body_rot", "local_body_vel", "local_body_ang_vel", "feet_contacts"]
+task_inputs: ["diff_local_body_pos", "diff_local_vel", "local_ref_body_pos"]
+control_mode: "PD"

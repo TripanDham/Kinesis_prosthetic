@@ -229,7 +229,7 @@ class AgentHumanoid(AgentPPO, ABC):
         )
 
     def save_curr(self) -> None:
-        """
+        """and how 
         Save the current state as the latest model.
         """
         torch.save(self.get_full_state_weights(), f"{self.cfg.output_dir}/model.pth")
@@ -266,8 +266,8 @@ class AgentHumanoid(AgentPPO, ABC):
             logger.info("Starting model from scratch.")
 
         # Load motions
-        if self.cfg.run.im_eval == False:
-            self.env.sample_motions()
+        # if self.cfg.run.im_eval == False:
+        #     self.env.sample_motions()
 
         to_device(self.device, self.policy_net, self.value_net)
 
