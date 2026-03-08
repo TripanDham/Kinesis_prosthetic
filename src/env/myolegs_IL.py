@@ -55,7 +55,8 @@ class MyoLegsGAIL(MyoLegsGailTask):
         self.gail_disc = GAILDiscrim(
             state_shape=(obs_size,),
             action_shape=(0,), # State-only GAIL
-            hidden_units=cfg.env.get("gail_hidden_units", (256, 256))
+            hidden_units=cfg.env.get("gail_hidden_units", (256, 256)),
+            state_only=True
         ).to(cfg.run.get("device", "cpu"))
         
         self.optim_disc = Adam(self.gail_disc.parameters(), lr=cfg.env.get("gail_lr", 1e-4))

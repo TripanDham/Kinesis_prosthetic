@@ -1,2 +1,11 @@
-/data
+/data/KIT
 /wandb
+/data/smpl
+/data/t2m
+/data/emg_assets
+/data/kit_test_motion_dict.pkl
+/data/kit_train_motion_dict.pkl
+/data/kit_test_keys.txt
+/data/kit_train_keys.txt
+/data/trained_models
+/data/buffers

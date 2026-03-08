@@ -1,0 +1,84 @@
+<?xml version="1.0" ?>
+<mujoco model="OSL_MyoLegs_v0.0.1">
+<!-- =================================================
+    Copyright 2024 Chun Kwang Tan, Elizabeth Wilson, Adan Yusseff Dominguez Ruiz, Vikash Kumar, Vittorio Caggiano, Huawei Wang
+    Model   :: OSL MyoLeg (MuJoCoV2.0)
+    Author  :: Chun Kwang Tan (cktan.neumove@gmail.com), Elizabeth Wilson (elizwils@umich.edu), Adan Yusseff Dominguez Ruiz (adanydr@outlook.com), Vikash Kumar, Vittorio Caggiano, Huawei Wang
+    Original Author :: Vikash Kumar (vikashplus@gmail.com), Vittorio Caggiano, Huawei Wang
+    source  :: https://github.com/MyoHub
+    License :: Under Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+====================================================== -->
+    <!-- <include file="terrain_config80.xml"/> -->
+    <include file="myotorsorigid_assets.xml"/>
+    <include file="myolegs_assets_OSL_KA.xml"/>
+    <!-- <compiler angle="radian" meshdir="../../../myosuite/simhive/myo_sim" texturedir="../../../myosuite/simhive/myo_sim"/> -->
+
+    <statistic center="0 0 0.6" extent="2.5"/>
+
+    <compiler coordinate="local"/>
+    <default>
+        <joint damping="0.0" armature="0.01" stiffness="0.0" limited="true"/>
+        <geom conaffinity="1" condim="3" contype="7" margin="0.001" rgba="0.8 0.6 .4 1"/>
+        <tendon width="0.006"/>
+    </default>
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1=".4 .5 .6" rgb2="0 0 0" width="100" height="100"/>
+        <!-- <texture type="skybox" builtin="gradient" rgb1="1 1 1" rgb2="1 1 1" width="100" height="100"/> -->
+
+        <!-- <texture type="skybox" file="nebulae.png" gridsize="3 4" gridlayout=".U..LFRB.D.."/> -->
+        <texture builtin="flat" height="1278" mark="cross" markrgb="1 1 1" name="texgeom" random="0.01" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" type="cube" width="127"/>
+        <texture builtin="checker" height="100" name="texplane" rgb1="0.2549 0.3765 0.5098" rgb2="0.10588 0.2117 0.3215" type="2d" width="100"/>
+        <!-- <texture builtin="checker" height="100" name="texplane" rgb1="1 1 1" rgb2="1 1 1" type="2d" width="100"/> -->
+
+        <material name="MatPlane" reflectance="0.8" shininess="1" specular="1" texrepeat="60 60" texture="texplane"/>
+        <material name="geom" texture="texgeom" texuniform="true"/>
+    </asset>
+
+    <visual>
+        <map haze="0.8"/>
+        <rgba haze="0 0 0 1"/>
+    </visual>
+
+    <worldbody>
+        <site name="pelvis_target" size="0.02" pos="0 0 .92" group="4"/>
+        <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular=".1 .1 .1"/>
+        <geom conaffinity="1" condim="3" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="100 100 .2" type="plane" material="MatPlane"/>
+        <body name="root" pos="0 0 1" euler="0 0 -1.57">
+            <body name="torso" childclass="myotorso" pos="0 0 0">
+                <geom mesh="torso" name="torso" type="mesh" pos="0 0 -.94" euler="0 0 -1.57"/>
+
+                <body name="head" pos="-.21 0 .090" euler="1.57 0 -.2">
+                    <geom class="myotorso_coll" name="hat_spine_coll" type="capsule" size="0.055 0.10" pos="-.01 .510 0" euler="1.57 .2 0"/>
+                    <geom class="myotorso_coll" name="hat_jaw_coll2" type="ellipsoid" size="0.07 0.12 0.065" pos=".025 .545 0" euler="0 0 .7"/>
+                    <geom class="myotorso_coll" name="hat_skull_coll" type="ellipsoid" size="0.1 0.1 0.075" pos="0 .575 0"/>
+                    <inertial pos="0 0 0" mass="5.0"/>
+                </body>
+
+                <geom type="capsule" class="myotorso_coll" size="0.080 0.077"  pos="-.065 0 .060" euler="1.57 0 0"/>
+                <geom type="ellipsoid" class="myotorso_coll" size="0.095 0.140 0.140"  pos="-.085 0 .200" euler="1.57 0 0"/>
+                <geom type="capsule" class="myotorso_coll" size="0.110 0.065"  pos="-.090 0 .330" euler="1.57 0 0"/>
+                <geom type="capsule" class="myotorso_coll" size="0.075 0.145"  pos="-.110 0 .415" euler="1.57 0 0"/>
+
+                <inertial pos="-0.07 0 0.287572" mass="37.4" diaginertia="0.910036 0.839113 0.34246" />
+                <!-- Arms -->
+                <geom name="humerus_r" type="capsule" class="myotorso_coll" size="0.042" fromto="-.094 -.162 .445 -.088 -.175 .166"/>
+                <geom name="ulna_rv" type="capsule" class="myotorso_coll" size="0.030" fromto="-.088 -.175 .166 -.1 -.2 -.092"/>
+                <geom name="humerus_l" type="capsule" class="myotorso_coll" size="0.042" fromto="-.094 .162 .445 -.088 .175 .166"/>
+                <geom name="ulna_lv" type="capsule" class="myotorso_coll" size="0.030" fromto="-.088 .175 .166 -.1 .2 -.092"/>
+
+            </body>
+        
+            <include file="myolegs_chain_OSL_KA.xml"/>
+            <freejoint name="root"/>
+        </body>
+    </worldbody>
+
+    <keyframe>
+        <key name='stand' qpos='0 0 .95 0.707388 0 0 -0.706825 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/>
+        <key name='neutral_1' qpos='0 0 .92 0.707388 0 0 -0.706825 0.161153 -0.0279385 -0.041886 0 0 0 0 0.461137 0.334 0.161153 -0.0279385 -0.041886 0.00247908 0.00101098 0.461137 0.0275069 0.136817 0.334 -0.00117055 -0.000125295 -0.0302192 0.0395202 -0.194029'/>
+        <key name='neutral_2' qpos='0 0 .9 0.707388 0 0 -0.706825 0.405648 -0.020957 -0.118677 0 0 0 0 0.7329 0.40143 0.405648 -0.020957 -0.118677 0.0039054 0.00122326 0.7329 0.0102961 0.215496 0.40143 -0.006982 -0.02618 -0.03738 0.0080579 -0.87272'/>
+        <key name='osl_backward' qpos='0 0 0.86  0.7011 0.0923 0.0923 -0.7011     -0.233 -0.0279385 -0.041886 0 0 0 0 0.377 0.1672 0.785 -0.0279385 -0.041886 0.00247908 0.0010198 0.209 0.0275069 0.136817 -0.0524 -0.00117055 -0.000125295 -0.0302192 0.0395202 -0.194029' qvel='0 -1.2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/>
+        <key name='osl_forward' qpos='0 0 0.86   0.7011 0.0923 0.0923 -0.7011    0.785 -0.0279385 -0.041886 0 0 0 0 0.209 -0.0524 -0.2326 -0.0279385 -0.041886 0.00247908 0.0010198 0.377 0.0275069 0.136817 0.1672 -0.00117055 -0.000125295 -0.0302192 0.0395202 -0.194029' qvel='0 -1.2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/>
+    </keyframe>
+
+</mujoco>

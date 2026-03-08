@@ -23,5 +23,5 @@ reward_specs:
   w_upright: 1.0
   w_vel: 0.2
 sim_timestep_inv: 150
-task: MyoLegs Imitation
+task: MyoLegs OSL_KA GAIL
 termination_distance: 0.15
