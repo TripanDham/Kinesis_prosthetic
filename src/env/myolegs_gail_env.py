@@ -36,15 +36,22 @@ class MyoLegsGailEnv(BaseEnv):
         self.setup_myolegs_params()
         self.reward_info = {}
         
+        self.impedance_control = cfg.env.get("impedance_control", False)
+        
         self.observation_space = gym.spaces.Box(
             -np.inf * np.ones(self.get_obs_size()),
             np.inf * np.ones(self.get_obs_size()),
             dtype=self.dtype,
         )
         
+        num_actions = self.mj_model.nu
+        if self.impedance_control:
+            # Replace motor actions (2) with impedance parameters (2 * 3 = 6)
+            num_actions = (self.mj_model.nu - len(self.motor_idx)) + (len(self.motor_idx) * 3)
+
         self.action_space = gym.spaces.Box(
-            low=-np.ones(self.mj_model.nu),
-            high=np.ones(self.mj_model.nu),
+            low=-np.ones(num_actions),
+            high=np.ones(num_actions),
             dtype=self.dtype,
         )
 
@@ -274,8 +281,45 @@ class MyoLegsGailEnv(BaseEnv):
         
         # Action for muscles (PD control)
         muscle_action = action[self.muscle_idx]
-        # Action for motors (Direct torque)
-        motor_action = action[self.motor_idx]
+        
+        if self.impedance_control:
+            # Layout: [muscles (54), knee_K, knee_B, knee_th, ankle_K, ankle_B, ankle_th]
+            imp_knee = action[54:57]
+            imp_ankle = action[57:60]
+            
+            # Map Knee (Gear: 49.4)
+            K_knee = (imp_knee[0] + 1.0) * 250.0
+            B_knee = (imp_knee[1] + 1.0) * 5.0
+            j_knee = self.mj_model.actuator_trnid[self.motor_idx[0], 0]
+            min_k, max_k = self.mj_model.jnt_range[j_knee]
+            target_knee = min_k + (imp_knee[2] + 1.0) * (max_k - min_k) / 2.0
+            
+            q_knee = self.mj_data.qpos[self.mj_model.jnt_qposadr[j_knee]]
+            v_knee = self.mj_data.qvel[self.mj_model.jnt_dofadr[j_knee]]
+            # User formula: Torque = K(theta - theta_desired) + B(theta dot)
+            torque_knee = K_knee * (q_knee - target_knee) + B_knee * v_knee
+            
+            # Map Ankle (Gear: 58.4)
+            K_ankle = (imp_ankle[0] + 1.0) * 250.0
+            B_ankle = (imp_ankle[1] + 1.0) * 5.0
+            j_ankle = self.mj_model.actuator_trnid[self.motor_idx[1], 0]
+            min_a, max_a = self.mj_model.jnt_range[j_ankle]
+            target_ankle = min_a + (imp_ankle[2] + 1.0) * (max_a - min_a) / 2.0
+            
+            q_ankle = self.mj_data.qpos[self.mj_model.jnt_qposadr[j_ankle]]
+            v_ankle = self.mj_data.qvel[self.mj_model.jnt_dofadr[j_ankle]]
+            torque_ankle = K_ankle * (q_ankle - target_ankle) + B_ankle * v_ankle
+            
+            # Set ctrl values (accounting for gear)
+            # Gear is in mj_model.actuator_gear[motor_idx, 0]
+            motor_ctrl = np.array([
+                torque_knee / self.mj_model.actuator_gear[self.motor_idx[0], 0],
+                torque_ankle / self.mj_model.actuator_gear[self.motor_idx[1], 0]
+            ])
+        else:
+            # Action for motors (Direct torque)
+            motor_action = action[self.motor_idx]
+            motor_ctrl = 2.88 * motor_action
 
         if self.control_mode == "PD":
             target_lengths = action_to_target_length_custom(muscle_action, self.mj_model, self.muscle_idx)
@@ -294,8 +338,8 @@ class MyoLegsGailEnv(BaseEnv):
                     
                     # Update control for muscles
                     ctrl[self.muscle_idx] = muscle_activity
-                    # Update control for motors (direct output)
-                    ctrl[self.motor_idx] = 2.88 * motor_action
+                    # Update control for motors
+                    ctrl[self.motor_idx] = motor_ctrl
 
                 elif self.control_mode == "direct":
                     ctrl[:] = (action + 1.0) / 2.0

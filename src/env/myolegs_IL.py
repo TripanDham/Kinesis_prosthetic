@@ -192,7 +192,7 @@ class MyoLegsGAIL(MyoLegsGailTask):
         w_muscle = self.cfg.run.get("muscle_effort_weight", 0.01)
         w_motor = self.cfg.run.get("motor_effort_weight", 0.01)
         
-        reward = im_reward + 0.1 * vel_reward + 0.1 * upright_reward - w_muscle * muscle_effort - w_motor * motor_effort
+        reward = 1 * im_reward + 0.2 * vel_reward + 0.3 * upright_reward - 0.01 * muscle_effort - 0.03 * motor_effort
         
         self.reward_info = {
             "imitation_reward_gail": im_reward, 

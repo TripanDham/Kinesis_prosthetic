@@ -32,7 +32,7 @@ random.seed(0)
 from src.utils.torch_utils import to_torch
 from easydict import EasyDict
 
-from src.KinesisCore.forward_kinematics import ForwardKinematics
+# from src.KinesisCore.forward_kinematics import ForwardKinematics
 
 torch.set_num_threads(1)
 
