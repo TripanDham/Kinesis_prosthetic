@@ -270,12 +270,44 @@ class MyoLegsGAIL(MyoLegsGailTask):
         if not self.cfg.run.test or not getattr(self.cfg.run, "record_biomechanics", False):
             return
             
+        # Record heights for ground clearance diagnostics
+        # osl_foot_assembly (12), calcn_l (16)
+        # We use xpos[index, 2] for the Z-coordinate
+        right_foot_z = self.mj_data.xpos[12, 2]
+        left_foot_z = self.mj_data.xpos[16, 2]
+        
+        # Get ankle heights as well (joints 9 and 18)
+        # Note: bodies associated with these joints might be better. 
+        # For osl_ankle, it's body 'osl_ankle_assembly' (11).
+        # For ankle_l, it's body 'talus_l' (15).
+        right_ankle_z = self.mj_data.xpos[11, 2]
+        left_ankle_z = self.mj_data.xpos[15, 2]
+
+        # Calculate Net Torque (aggregate joint moments) as requested:
+        # qfrc_actuator + qfrc_applied + qfrc_passive - qfrc_bias
+        # We use getattr for robustness across MuJoCo versions
+        q_act = self.mj_data.qfrc_actuator.copy()
+        q_app = getattr(self.mj_data, "qfrc_applied", np.zeros_like(q_act)).copy()
+        q_pas = getattr(self.mj_data, "qfrc_passive", np.zeros_like(q_act)).copy()
+        q_bia = getattr(self.mj_data, "qfrc_bias", np.zeros_like(q_act)).copy()
+        
+        net_torque = q_act + q_app + q_pas - q_bia
+
         data = {
             "qpos": self.mj_data.qpos.copy(),
             "qvel": self.mj_data.qvel.copy(),
             "ctrl": self.mj_data.ctrl.copy(),
+            "qfrc_actuator": net_torque, # Rename to qfrc_actuator for plotter compatibility or use new key
+            "qfrc_actuator_only": self.mj_data.qfrc_actuator.copy(),
             "actuator_force": self.mj_data.actuator_force.copy(),
-            "actuator_activation": getattr(self.mj_data, "actuator_activation", getattr(self.mj_data, "act", np.zeros(0))).copy()
+            "actuator_activation": getattr(self.mj_data, "actuator_activation", getattr(self.mj_data, "act", np.zeros(0))).copy(),
+            "impedance": getattr(self, "last_impedance", {}).copy(),
+            "heights": {
+                "right_foot": right_foot_z,
+                "left_foot": left_foot_z,
+                "right_ankle": right_ankle_z,
+                "left_ankle": left_ankle_z
+            }
         }
         self.biomechanics_data.append(data)
 

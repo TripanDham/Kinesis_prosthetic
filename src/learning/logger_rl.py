@@ -61,6 +61,15 @@ class LoggerRL:
         logger.avg_reward = logger.total_reward / logger.num_steps
         logger.max_reward = max([x.max_reward for x in logger_list])
         logger.min_reward = min([x.min_reward for x in logger_list])
-        logger.info_dict = {k: np.mean(np.concatenate([np.array(x.info_dict[k]) for x in logger_list])) for k in logger_list[0].info_dict.keys()}
+        logger.info_dict = {}
+        for k in logger_list[0].info_dict.keys():
+            try:
+                # Only average items that can be converted to a numeric array
+                data = np.concatenate([np.array(x.info_dict[k]) for x in logger_list])
+                if np.issubdtype(data.dtype, np.number):
+                    logger.info_dict[k] = np.mean(data)
+            except (ValueError, TypeError):
+                # Skip non-numeric data like biomechanics_data
+                continue
         
         return logger
